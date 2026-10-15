@@ -47,6 +47,18 @@
   .preview { margin-top:1.5rem; padding:1rem; border:3px dashed var(--soft); border-radius:8px; } .preview:empty { display:none; }
   .help { color:var(--soft); font-size:1rem; } .help code { background:rgba(0,0,0,.35); padding:0 .3rem; border-radius:4px; }
   #status { min-height:1.6em; color:var(--soft); font-size:1rem; }
+  .search { position:relative; margin:0 0 1rem; }
+  .search input { margin:0; border-radius:999px; padding:.45rem 1rem; font-size:1rem; }
+  #suggest { position:absolute; z-index:5; left:0; right:0; margin:.3rem 0 0; padding:0; list-style:none; background:var(--deep); border:3px solid var(--paper); border-radius:8px; overflow:hidden; }
+  #suggest:empty { display:none; }
+  #suggest a { display:block; padding:.4rem 1rem; color:var(--paper); text-decoration:none; border:0; border-radius:0; margin:0; font-weight:400; }
+  #suggest a:hover, #suggest a:focus-visible { background:rgba(255,255,255,.15); transform:none; }
+  .card { margin:0 0 .9rem; border:3px solid var(--paper); border-radius:8px; overflow:hidden; }
+  .card .head { display:flex; justify-content:space-between; align-items:baseline; gap:1rem; padding:.55rem 1rem; font-size:1.5rem; font-weight:700; color:#fff; text-decoration:none;
+    background:linear-gradient(90deg,var(--bar) 60%,#2fa12f); text-shadow:0 1px 2px rgba(0,0,0,.45); }
+  .card .head small { font-size:1rem; font-weight:400; }
+  .card .body { padding:.7rem 1rem; background:rgba(0,0,0,.3); font-size:1rem; }
+  mark { background:#ffd84d; color:#222; border-radius:3px; padding:0 .15rem; }
   footer { margin-top:3rem; color:var(--soft); font-size:1rem; clear:both; }
   @media (max-width:760px) { .shell { flex-direction:column; gap:1rem; padding:1rem; } nav { position:static; flex:none; } nav a { display:inline-block; } .infobox { float:none; width:100%; margin:0 0 1rem; } }
 </style>
@@ -55,12 +67,16 @@
 <div class="shell">
   <nav aria-label="Wiki">
     <p class="brand">Mafia</p>
-    <a href="#/Main_Page" data-t="Main Page">Main Page</a>
-    <a href="#/How_to_Play" data-t="How to Play">How to Play</a>
-    <a href="#/Factions" data-t="Factions">Factions</a>
-    <a href="#/Roles" data-t="Roles">Roles</a>
-    <a href="#/Special%3AAllPages" data-t="Special:AllPages">All pages</a>
-    <a href="#/Special%3ANewPage" data-t="Special:NewPage">Add a page</a>
+    <div class="search">
+      <input id="q" type="search" placeholder="Search pages" aria-label="Search pages" autocomplete="off">
+      <ul id="suggest" aria-label="Suggestions"></ul>
+    </div>
+    <a href="#Main_Page" data-t="Main Page">Main Page</a>
+    <a href="#How_to_Play" data-t="How to Play">How to Play</a>
+    <a href="#Factions" data-t="Factions">Factions</a>
+    <a href="#Roles" data-t="Roles">Roles</a>
+    <a href="#Special:AllPages" data-t="Special:AllPages">All pages</a>
+    <a href="#Special:NewPage" data-t="Special:NewPage">Add a page</a>
   </nav>
   <main>
     <p id="status" role="status"></p>
@@ -76,14 +92,14 @@ var pages = {};   // normalised title -> { title, text, author }
 function esc(s) { return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function unesc(s) { return s.replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&amp;/g,"&"); }
 function norm(t) { t = t.replace(/_/g," ").replace(/\s+/g," ").trim(); return t.charAt(0).toUpperCase() + t.slice(1); }
-function slug(t) { return encodeURIComponent(norm(t).replace(/ /g,"_")); }
+function slug(t) { return encodeURIComponent(norm(t).replace(/ /g,"_")).replace(/%3A/gi,":").replace(/%2F/gi,"/").replace(/%28/g,"(").replace(/%29/g,")"); }
 function pageExists(key) { return !!pages[key] || /^(Special|Category):/.test(key); }
 
 function inline(s) {
   s = esc(s);
   s = s.replace(/\[\[([^\[\]|]+?)(?:\|([^\[\]]+?))?\]\]/g, function (m, t, label) {
     t = unesc(t); var key = norm(t);
-    return '<a href="#/' + slug(key) + '"' + (pageExists(key) ? "" : ' class="missing"') + ">" + (label || esc(t)) + "</a>";
+    return '<a href="#' + slug(key) + '"' + (pageExists(key) ? "" : ' class="missing"') + ">" + (label || esc(t)) + "</a>";
   });
   s = s.replace(/\[(https?:\/\/[^\s\]]+)(?:\s+([^\]]+))?\]/g, function (m, u, label) {
     return '<a href="' + u + '" target="_blank" rel="noopener nofollow ugc">' + (label || u) + "</a>";
@@ -141,6 +157,35 @@ function render(text) {
   flushPara(); closeLists();
   return { html: boxes.join("") + out.join("\n"), cats: cats };
 }
+
+/* ------------------------------------------------------------------ search */
+function plain(t) {
+  return t.replace(/\{\{[\s\S]*?\}\}/g, " ").replace(/\[\[\s*Category:[^\]]*\]\]/gi, " ")
+    .replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, "$1").replace(/\[https?:\/\/\S+\s*([^\]]*)\]/g, "$1")
+    .replace(/'{2,3}/g, "").replace(/^=+\s*|\s*=+\s*$/gm, "").replace(/^[*#]+\s*/gm, "").replace(/\s+/g, " ").trim();
+}
+function snippet(body, i, len) {
+  if (i < 0) return esc(body.slice(0, 140));
+  var s = Math.max(0, i - 60), e = Math.min(body.length, i + len + 80);
+  return (s ? "\u2026" : "") + esc(body.slice(s, i)) + "<mark>" + esc(body.slice(i, i + len)) + "</mark>" + esc(body.slice(i + len, e)) + (e < body.length ? "\u2026" : "");
+}
+function searchPages(q) {
+  q = q.trim().toLowerCase();
+  if (!q) return [];
+  var words = q.split(/\s+/), res = [];
+  Object.keys(pages).forEach(function (k) {
+    var p = pages[k], t = p.title.toLowerCase(), body = plain(p.text), b = body.toLowerCase(), score = 0, at = -1, len = q.length;
+    if (t === q) score = 100; else if (t.indexOf(q) === 0) score = 80; else if (t.indexOf(q) >= 0) score = 60;
+    at = b.indexOf(q);
+    if (at >= 0) score += 10;
+    if (!score && words.every(function (w) { return (t + " " + b).indexOf(w) >= 0; })) {
+      score = 5; at = b.indexOf(words[0]); len = words[0].length;
+    }
+    if (score) res.push({ title: p.title, score: score, snippet: snippet(body, at, len), cats: extractCats(p.text) });
+  });
+  res.sort(function (a, b) { return b.score - a.score || a.title.localeCompare(b.title); });
+  return res;
+}
 // ---- DOM ----
 /* -------------------------------------------------------------------- app */
 var POINTER = "https://raw.githubusercontent.com/Daylight-Studios-Scratch/Mafia/refs/heads/main/Backend%20HTTP.txt";
@@ -170,38 +215,52 @@ function loadPages() {
     .then(function (r) { if (!r.ok) throw new Error("http"); return r.json(); })
     .then(function (d) {
       (d.pages || []).forEach(function (p) { pages[norm(p.title)] = { title: norm(p.title), text: p.body, author: p.author }; });
+      (d.deleted || []).forEach(function (t) { delete pages[norm(t)]; });
       route();
     })
     .catch(function () { backendUrl = null; statusEl.textContent = "Community edits are offline right now. You're seeing the saved version of the wiki."; });
 }
 
 function tabs(title, active) {
-  return '<div class="tabs"><a href="#/' + slug(title) + '"' + (active === "page" ? ' aria-current="page"' : "") + '>Page</a>' +
-         '<a href="#/' + slug("Special:Edit/" + title) + '"' + (active === "edit" ? ' aria-current="page"' : "") + ">Edit</a></div>";
+  return '<div class="tabs"><a href="#' + slug(title) + '"' + (active === "page" ? ' aria-current="page"' : "") + '>Page</a>' +
+         '<a href="#' + slug("Special:Edit/" + title) + '"' + (active === "edit" ? ' aria-current="page"' : "") + ">Edit</a></div>";
 }
 
 function viewPage(title) {
   var p = pages[title];
   if (!p) {
     view.innerHTML = tabs(title, "page") + "<h1>" + esc(title) + "</h1><p>This page doesn't exist yet.</p>" +
-      '<a class="btn" href="#/' + slug("Special:Edit/" + title) + '">Create this page</a>';
+      '<a class="btn" href="#' + slug("Special:Edit/" + title) + '">Create this page</a>';
     return;
   }
   var r = render(p.text), cats = "";
-  if (r.cats.length) cats = '<div class="cats">Categories: ' + r.cats.map(function (c) { return '<a href="#/' + slug("Category:" + c) + '">' + esc(c) + "</a>"; }).join(", ") + "</div>";
+  if (r.cats.length) cats = '<div class="cats">Categories: ' + r.cats.map(function (c) { return '<a href="#' + slug("Category:" + c) + '">' + esc(c) + "</a>"; }).join(", ") + "</div>";
   view.innerHTML = tabs(title, "page") + "<h1>" + esc(title) + "</h1>" + r.html + cats +
     (p.author ? '<p class="help">Last edited by ' + esc(p.author) + ".</p>" : "");
 }
 
-function listPages(heading, titles) {
+function listPages(heading, titles, asCards) {
   titles.sort();
-  view.innerHTML = "<h1>" + esc(heading) + "</h1>" + (titles.length ? "<ul>" + titles.map(function (t) {
-    return '<li><a href="#/' + slug(t) + '">' + esc(t) + "</a></li>"; }).join("") + "</ul>" : "<p>No pages here yet.</p>");
+  var html = "<h1>" + esc(heading) + "</h1>";
+  if (!titles.length) html += "<p>No pages here yet.</p>";
+  else if (asCards) html += titles.map(function (t) {
+    return '<div class="card"><a class="head" href="#' + slug(t) + '">' + esc(t) + "</a></div>"; }).join("");
+  else html += "<ul>" + titles.map(function (t) { return '<li><a href="#' + slug(t) + '">' + esc(t) + "</a></li>"; }).join("") + "</ul>";
+  view.innerHTML = html;
+}
+
+function viewSearch(q) {
+  var res = searchPages(q);
+  view.innerHTML = "<h1>Search</h1><p class=\"help\">" + res.length + " result" + (res.length === 1 ? "" : "s") + " for \u201c" + esc(q) + "\u201d</p>" +
+    res.map(function (r) {
+      return '<div class="card"><a class="head" href="#' + slug(r.title) + '">' + esc(r.title) + "<small>" + esc(r.cats[0] || "") + "</small></a>" +
+             '<div class="body">' + r.snippet + "</div></div>";
+    }).join("");
 }
 
 function viewNewPage() {
   view.innerHTML = '<h1>Add a page</h1><label>Page title<input id="np-title" maxlength="60"></label><button class="btn" id="np-go" type="button">Start writing</button>';
-  function go() { var t = document.getElementById("np-title").value.trim(); if (t) location.hash = "#/" + slug("Special:Edit/" + t); }
+  function go() { var t = document.getElementById("np-title").value.trim(); if (t) location.hash = "#" + slug("Special:Edit/" + t); }
   document.getElementById("np-go").onclick = go;
   document.getElementById("np-title").onkeydown = function (e) { if (e.key === "Enter") go(); };
 }
@@ -214,7 +273,7 @@ function viewEditor(title) {
     '<button class="btn" id="ed-preview" type="button">Preview</button><button class="btn" id="ed-save" type="button">Submit for review</button>' +
     '<p id="ed-status" class="help" role="status"></p><div class="preview" id="ed-box"></div>' +
     '<p class="help">Formatting: <code>== Heading ==</code> <code>\'\'\'bold\'\'\'</code> <code>\'\'italic\'\'</code> <code>[[Page]]</code> <code>[[Page|label]]</code> ' +
-    '<code>* list</code> <code># numbered</code> <code>[[Category:Roles]]</code> <code>{{Infobox role|name=...|faction=...|color=#e60000}}</code>. Edits are checked by the team before they appear.</p>';
+    '<code>* list</code> <code># numbered</code> <code>[[Category:Roles]]</code> <code>{{Infobox role|name=...|faction=...|color=#e60000}}</code>. Edits are checked by the team before they appear. To stop abuse, a scrambled version of your IP address is saved with your edit; the real address is never stored.</p>';
   var ta = document.getElementById("ed-text"), st = document.getElementById("ed-status");
   ta.value = p ? p.text : "";
   document.getElementById("ed-preview").onclick = function () {
@@ -235,12 +294,14 @@ function viewEditor(title) {
 function route() {
   var raw = ""; try { raw = decodeURIComponent((location.hash || "").replace(/^#\/?/, "")); } catch (e) {}
   var title = norm(raw || "Main Page"), m;
-  if ((m = /^Special:Edit\/(.+)$/.exec(title))) { title = norm(m[1]); viewEditor(title); }
-  else if (title === "Special:AllPages") { listPages("All pages", Object.keys(pages)); }
+  if ((m = /^Special:Search\/(.*)$/i.exec(raw))) { title = "Special:Search"; viewSearch(m[1]); }
+  else if ((m = /^Special:Edit\/(.+)$/.exec(title))) { title = norm(m[1]); viewEditor(title); }
+  else if (title === "Special:AllPages") { listPages("All pages", Object.keys(pages).map(function (k) { return pages[k].title; }), false); }
   else if (title === "Special:NewPage") { viewNewPage(); }
   else if (/^Category:/.test(title)) {
     var c = norm(title.slice(9));
-    listPages("Category: " + c, Object.keys(pages).filter(function (k) { return extractCats(pages[k].text).indexOf(c) >= 0; }));
+    listPages("Category: " + c, Object.keys(pages).filter(function (k) { return extractCats(pages[k].text).indexOf(c) >= 0; })
+      .map(function (k) { return pages[k].title; }), true);
   } else { viewPage(title); }
   document.title = title + " | Mafia Wiki";
   Array.prototype.forEach.call(document.querySelectorAll("nav a"), function (a) {
@@ -249,6 +310,19 @@ function route() {
   window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", route);
+
+var qEl = document.getElementById("q"), sugEl = document.getElementById("suggest");
+function closeSuggest() { sugEl.innerHTML = ""; }
+qEl.addEventListener("input", function () {
+  var res = searchPages(qEl.value).slice(0, 6);
+  sugEl.innerHTML = res.map(function (r) { return '<li><a href="#' + slug(r.title) + '">' + esc(r.title) + "</a></li>"; }).join("");
+});
+qEl.addEventListener("keydown", function (e) {
+  if (e.key === "Enter" && qEl.value.trim()) { closeSuggest(); location.hash = "#Special:Search/" + encodeURIComponent(qEl.value.trim()); }
+  else if (e.key === "Escape") { closeSuggest(); }
+});
+document.addEventListener("click", function (e) { if (!e.target.closest(".search")) closeSuggest(); });
+sugEl.addEventListener("click", function () { closeSuggest(); qEl.value = ""; });
 loadPages();
 </script>
 </body>
