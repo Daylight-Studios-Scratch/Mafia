@@ -206,16 +206,17 @@ function getBackend() {
 function withTimeout(ms) { var c = new AbortController(); setTimeout(function () { c.abort(); }, ms); return c.signal; }
 
 function loadPages() {
-  fetch("pages.json")
+  fetch("pages.json", { cache: "no-cache" })
     .then(function (r) { if (!r.ok) throw new Error("pages.json: HTTP " + r.status); return r.json(); })
     .then(function (o) {
       Object.keys(o).forEach(function (t) { pages[norm(t)] = { title: norm(t), text: o[t] }; });
       route();
       return true;
     })
-    .catch(function () {
+    .catch(function (e) {
       view.innerHTML = "<h1>Wiki unavailable</h1><p>The page data (<code>pages.json</code>) couldn't be loaded. " +
-        "If you run this wiki, check that <code>pages.json</code> is uploaded next to <code>index.html</code>.</p>";
+        "If you run this wiki, check that <code>pages.json</code> is uploaded next to <code>index.html</code> and is valid JSON.</p>" +
+        '<p class="help">Details: ' + esc(String(e && e.message || e)) + "</p>";
       return false;
     })
     .then(function (ok) {
