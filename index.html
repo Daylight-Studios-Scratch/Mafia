@@ -1,1 +1,255 @@
-nothing at the moment. neat.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mafia Wiki</title>
+<meta name="description" content="Rules, phases, factions and roles for Mafia, an online social deduction game on Scratch.">
+<style>
+  :root {
+    --rain: #2b3239;
+    --deep: #1a1f24;
+    --bar: #6f6f6f;
+    --paper: #ffffff;
+    --soft: #c9d0d6;
+    --serif: "Times New Roman", Times, Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: 1rem; }
+  body {
+    margin: 0;
+    color: var(--paper);
+    font-family: var(--serif);
+    font-size: 1.15rem;
+    line-height: 1.6;
+    background:
+      repeating-linear-gradient(100deg, rgba(255,255,255,.035) 0 1px, transparent 1px 11px),
+      linear-gradient(180deg, var(--rain), var(--deep));
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  a { color: #9fd0ff; }
+  .shell { display: flex; max-width: 1100px; margin: 0 auto; gap: 2rem; padding: 1.5rem; }
+  nav { flex: 0 0 13rem; position: sticky; top: 1.5rem; align-self: flex-start; }
+  nav .brand { font-size: 2.2rem; font-weight: 700; margin: 0 0 1rem; line-height: 1; }
+  nav a {
+    display: block; padding: .5rem .8rem; margin-bottom: .35rem;
+    color: var(--paper); text-decoration: none; font-weight: 700;
+    border: 3px solid transparent; border-radius: 6px;
+  }
+  nav a:hover { border-color: var(--soft); }
+  nav a[aria-current="page"] { border-color: var(--paper); background: rgba(255,255,255,.12); }
+  a:focus-visible, summary:focus-visible { outline: 3px solid #ffd84d; outline-offset: 2px; }
+  main { flex: 1; min-width: 0; max-width: 46rem; }
+  h1, h2, h3 { line-height: 1.15; margin: 0 0 .8rem; }
+  h1 { font-size: clamp(3rem, 9vw, 5.5rem); letter-spacing: -.02em; }
+  h2 { font-size: 2rem; margin-top: 2rem; }
+  p { margin: 0 0 1rem; }
+  .lead { font-size: 1.35rem; }
+  .js section[data-page] { display: none; }
+  .js section[data-page].active { display: block; }
+  .notice {
+    border: 3px solid var(--paper); border-radius: 8px; padding: .8rem 1rem;
+    background: rgba(255,255,255,.08); margin: 1.2rem 0;
+  }
+  .play {
+    display: inline-block; margin-top: .5rem; padding: .6rem 1.4rem;
+    font-weight: 700; font-size: 1.3rem; text-decoration: none; color: #fff;
+    background: linear-gradient(90deg, var(--bar) 55%, #2fa12f);
+    border: 3px solid var(--paper); border-radius: 6px;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td { text-align: left; padding: .5rem .8rem; border-bottom: 2px solid rgba(255,255,255,.25); }
+  th { border-bottom-color: var(--paper); }
+
+  /* Hover: buttons tilt a little (alternating direction in the menu) */
+  nav a, .play, details.role { transition: transform .15s ease, border-color .15s ease; }
+  nav a:nth-of-type(odd):hover,  nav a:nth-of-type(odd):focus-visible  { transform: rotate(-2.5deg) scale(1.04); }
+  nav a:nth-of-type(even):hover, nav a:nth-of-type(even):focus-visible { transform: rotate(2.5deg) scale(1.04); }
+  .play:hover, .play:focus-visible { transform: rotate(-2deg) scale(1.06); }
+  details.role:not([open]):hover { transform: rotate(-.7deg) scale(1.01); }
+  @media (prefers-reduced-motion: reduce) {
+    nav a, .play, details.role { transition: none; }
+    nav a:hover, nav a:focus-visible, .play:hover, .play:focus-visible,
+    details.role:not([open]):hover { transform: none; }
+  }
+
+  /* Role bars: gray fading into the role's colour, like the in-game cards */
+  details.role { margin: 0 0 .9rem; border: 3px solid var(--paper); border-radius: 8px; overflow: hidden; }
+  details.role summary {
+    list-style: none; cursor: pointer; padding: .55rem 1rem;
+    display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
+    font-size: 1.6rem; font-weight: 700;
+    background: linear-gradient(90deg, var(--bar) 60%, var(--c));
+    text-shadow: 0 1px 2px rgba(0,0,0,.45);
+  }
+  details.role summary::-webkit-details-marker { display: none; }
+  details.role summary small { font-size: 1rem; font-weight: 400; }
+  details.role[open] summary { border-bottom: 3px solid var(--paper); }
+  details.role .body { padding: .9rem 1rem .3rem; background: rgba(0,0,0,.25); }
+  .faction { margin: 0 0 1.4rem; }
+  .faction h3 { font-size: 1.5rem; }
+  footer { margin-top: 3rem; color: var(--soft); font-size: 1rem; }
+  @media (max-width: 760px) {
+    .shell { flex-direction: column; gap: 1rem; padding: 1rem; }
+    nav { position: static; flex: none; }
+    nav a { display: inline-block; }
+    nav .brand { margin-bottom: .5rem; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav aria-label="Wiki">
+    <p class="brand">Mafia</p>
+    <a href="#home">Home</a>
+    <a href="#play">How to play</a>
+    <a href="#factions">Factions</a>
+    <a href="#roles">Roles</a>
+  </nav>
+
+  <main>
+    <section data-page="home" class="active" id="home">
+      <h1>Mafia</h1>
+      <p class="lead">An online social deduction game on Scratch. Everyone gets a secret role. The Mafia strike at night, and everyone else has to work out who they are before it's too late.</p>
+      <div class="notice">
+        <p><strong>Beta.</strong> You need to be a Scratcher to play. Cloud variables don't work for New Scratchers.</p>
+        <p style="margin:0"><strong>Advertising is not allowed.</strong> It will be deleted and reported.</p>
+      </div>
+      <!-- Update this link if the final project ID changes. -->
+      <a class="play" href="https://scratch.mit.edu/projects/1388666001/">Play Mafia on Scratch</a>
+    </section>
+
+    <section data-page="play" id="play">
+      <h1>How to play</h1>
+      <h2>Joining a game</h2>
+      <p>Join the queue. When 5 players are in it, a 30 second countdown starts. When it reaches zero the game begins and every player gets a secret role.</p>
+
+      <h2>The phases</h2>
+      <p>A game moves through four phases. After Voting, it goes back to Intermission and repeats.</p>
+      <table>
+        <thead><tr><th>Phase</th><th>Length</th><th>What happens</th></tr></thead>
+        <tbody>
+          <tr><td>Intermission</td><td>15 seconds</td><td>A short break before the next night.</td></tr>
+          <tr><td>Night</td><td>60 seconds</td><td>The Mafia can shoot a player.</td></tr>
+          <tr><td>Discussion</td><td>60 seconds</td><td>Talk it through. The Vigilante can shoot a player.</td></tr>
+          <tr><td>Voting</td><td>30 seconds</td><td>Vote for a player to eject, or skip.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Shooting</h2>
+      <p>When someone is shot, the player is dead and the phase timer drops to 15 seconds.</p>
+
+      <h2>Voting</h2>
+      <p>Each living player gets one vote. Your vote is permanent until Voting ends, so choose carefully.</p>
+    </section>
+
+    <section data-page="factions" id="factions">
+      <h1>Factions</h1>
+      <p>Every role belongs to one of three factions.</p>
+      <div class="faction">
+        <h3>Mafia</h3>
+        <p>Stay hidden and take out everyone else. Roles: Mafia, Witch.</p>
+      </div>
+      <div class="faction">
+        <h3>Neutral</h3>
+        <p>Has its own goal, separate from the other factions. Roles: Jester.</p>
+      </div>
+      <div class="faction">
+        <h3>Citizens</h3>
+        <p>Work out who the Mafia are. Roles: Bodyguard, Spy, Vigilante, Doctor, Detective, Ringmaster, Judge.</p>
+      </div>
+    </section>
+
+    <section data-page="roles" id="roles">
+      <h1>Roles</h1>
+      <p>Select a role to read about it.</p>
+
+      <details class="role" style="--c:#e60000">
+        <summary>Mafia <small>Mafia faction</small></summary>
+        <div class="body"><p>Shoots a player during the night.</p></div>
+      </details>
+
+      <details class="role" style="--c:#e600e6">
+        <summary>Witch <small>Mafia faction</small></summary>
+        <div class="body"><p>Can silence players. More details coming soon.</p></div>
+      </details>
+
+      <details class="role" style="--c:#6b0000">
+        <summary>Jester <small>Neutral faction</small></summary>
+        <div class="body">
+          <p>Your goal is to get voted out, so act as suspiciously as you can.</p>
+          <p>If the Mafia kill you during the night, you lose. If you get voted out, or the Vigilante shoots you, you win and can bring 1 person with you to the afterlife.</p>
+          <p>The Jester also wins with the winning team, so if the Mafia win, you win with them.</p>
+        </div>
+      </details>
+
+      <details class="role" style="--c:#222222">
+        <summary>Bodyguard <small>Citizen faction</small></summary>
+        <div class="body"><p>Description coming soon.</p></div>
+      </details>
+
+      <details class="role" style="--c:#f26a0a">
+        <summary>Spy <small>Citizen faction</small></summary>
+        <div class="body"><p>Description coming soon.</p></div>
+      </details>
+
+      <details class="role" style="--c:#7a1ff0">
+        <summary>Vigilante <small>Citizen faction</small></summary>
+        <div class="body">
+          <p>You hold the fate of the Citizens. Shoot down the Mafia during Discussion.</p>
+          <p>If you shoot an innocent, you die too, and that includes the Jester. Everyone sees who you are when you shoot, so make sure the Doctor keeps healing you.</p>
+          <p>Your goal is to shoot down the Mafia.</p>
+        </div>
+      </details>
+
+      <details class="role" style="--c:#12c4ee">
+        <summary>Doctor <small>Citizen faction</small></summary>
+        <div class="body"><p>Heals other players. More details coming soon.</p></div>
+      </details>
+
+      <details class="role" style="--c:#0a5be6">
+        <summary>Detective <small>Citizen faction</small></summary>
+        <div class="body"><p>Description coming soon.</p></div>
+      </details>
+
+      <details class="role" style="--c:#f0e600">
+        <summary>Ringmaster <small>Citizen faction</small></summary>
+        <div class="body"><p>Description coming soon.</p></div>
+      </details>
+
+      <details class="role" style="--c:#2a8a1a">
+        <summary>Judge <small>Citizen faction</small></summary>
+        <div class="body">
+          <p>If there's a tie, you break it. You can silently choose one of the tied players to eject, or skip.</p>
+          <p>Nobody knows you're the Judge, so your identity stays hidden. You can also see who people voted for, or whether they skipped. Use that to work out who is lying about their role.</p>
+          <p>Your goal is to figure out who the Mafia are.</p>
+        </div>
+      </details>
+    </section>
+
+    <footer>Mafia is made by Daylight Studios. Currently in beta.</footer>
+  </main>
+</div>
+
+<script>
+  document.documentElement.classList.add("js");
+  var pages = Array.prototype.slice.call(document.querySelectorAll("section[data-page]"));
+  var links = Array.prototype.slice.call(document.querySelectorAll("nav a"));
+
+  function show() {
+    var id = location.hash.replace("#", "") || "home";
+    if (!pages.some(function (p) { return p.id === id; })) id = "home";
+    pages.forEach(function (p) { p.classList.toggle("active", p.id === id); });
+    links.forEach(function (a) {
+      if (a.getAttribute("href") === "#" + id) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    });
+    document.title = (id === "home" ? "Mafia Wiki" : id.charAt(0).toUpperCase() + id.slice(1) + " | Mafia Wiki");
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener("hashchange", show);
+  show();
+</script>
+</body>
+</html>
