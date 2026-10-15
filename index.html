@@ -63,6 +63,7 @@
   th { border-bottom-color: var(--paper); }
 
   /* Hover: buttons tilt a little (alternating direction in the menu) */
+  button.play { font-family: var(--serif); cursor: pointer; }
   nav a, .play, details.role { transition: transform .15s ease, border-color .15s ease; }
   nav a:nth-of-type(odd):hover,  nav a:nth-of-type(odd):focus-visible  { transform: rotate(-2.5deg) scale(1.04); }
   nav a:nth-of-type(even):hover, nav a:nth-of-type(even):focus-visible { transform: rotate(2.5deg) scale(1.04); }
@@ -89,6 +90,15 @@
   details.role .body { padding: .9rem 1rem .3rem; background: rgba(0,0,0,.25); }
   .faction { margin: 0 0 1.4rem; }
   .faction h3 { font-size: 1.5rem; }
+  label { display: block; margin: 0 0 1rem; font-weight: 700; }
+  input, textarea {
+    display: block; width: 100%; margin-top: .3rem; padding: .5rem .7rem;
+    font: inherit; color: var(--paper); background: rgba(0,0,0,.35);
+    border: 3px solid var(--paper); border-radius: 6px;
+  }
+  textarea { resize: vertical; }
+  .pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  #community-status { min-height: 1.6em; color: var(--soft); }
   footer { margin-top: 3rem; color: var(--soft); font-size: 1rem; }
   @media (max-width: 760px) {
     .shell { flex-direction: column; gap: 1rem; padding: 1rem; }
@@ -106,6 +116,7 @@
     <a href="#play">How to play</a>
     <a href="#factions">Factions</a>
     <a href="#roles">Roles</a>
+    <a href="#community">Community</a>
   </nav>
 
   <main>
@@ -228,6 +239,21 @@
       </details>
     </section>
 
+    <section data-page="community" id="community">
+      <h1>Community pages</h1>
+      <p>Pages written by players. New pages are checked by the team before they appear, and advertising is not allowed.</p>
+      <p id="community-status" role="status"></p>
+      <div id="community-list"></div>
+
+      <h2>Add a page</h2>
+      <form id="add-form">
+        <label>Title <input name="title" maxlength="60" required></label>
+        <label>Your name (optional) <input name="author" maxlength="30"></label>
+        <label>Page text <textarea name="body" rows="8" maxlength="4000" required></textarea></label>
+        <button class="play" type="submit">Add page</button>
+      </form>
+    </section>
+
     <footer>Mafia is made by Daylight Studios. Currently in beta.</footer>
   </main>
 </div>
@@ -247,7 +273,92 @@
     });
     document.title = (id === "home" ? "Mafia Wiki" : id.charAt(0).toUpperCase() + id.slice(1) + " | Mafia Wiki");
     window.scrollTo(0, 0);
+    if (id === "community") loadCommunity();
   }
+  // --- Community pages -----------------------------------------------------
+  // The server's address changes when the tunnel restarts, so it lives in a
+  // text file on GitHub. Edit that file when the address changes.
+  var POINTER = "https://raw.githubusercontent.com/Daylight-Studios-Scratch/Mafia/refs/heads/main/Backend%20HTTP.txt";
+  var backendUrl = null;
+  var statusEl = document.getElementById("community-status");
+  var listEl = document.getElementById("community-list");
+  var OFFLINE = "The community server is offline right now. Try again later.";
+
+  function getBackend() {
+    if (backendUrl) return Promise.resolve(backendUrl);
+    return fetch(POINTER, { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error("pointer"); return r.text(); })
+      .then(function (t) {
+        t = t.trim().replace(/\/+$/, "");
+        if (!/^https:\/\/[^\s]+$/.test(t)) throw new Error("bad address");
+        backendUrl = t;
+        return t;
+      });
+  }
+
+  function renderPages(pages) {
+    listEl.textContent = "";
+    if (!pages.length) { statusEl.textContent = "No community pages yet. Be the first to add one."; return; }
+    statusEl.textContent = "";
+    pages.forEach(function (p) {
+      var d = document.createElement("details");
+      d.className = "role";
+      d.style.setProperty("--c", "#2fa12f");
+      var sum = document.createElement("summary");
+      sum.appendChild(document.createTextNode(p.title));
+      var small = document.createElement("small");
+      small.textContent = p.author ? "by " + p.author : "";
+      sum.appendChild(small);
+      var body = document.createElement("div");
+      body.className = "body";
+      var para = document.createElement("p");
+      para.className = "pre";
+      para.textContent = p.body;   // plain text only: never HTML
+      body.appendChild(para);
+      d.appendChild(sum);
+      d.appendChild(body);
+      listEl.appendChild(d);
+    });
+  }
+
+  function loadCommunity() {
+    statusEl.textContent = "Loading community pages...";
+    getBackend()
+      .then(function (b) { return fetch(b + "/pages"); })
+      .then(function (r) { if (!r.ok) throw new Error("http"); return r.json(); })
+      .then(function (data) { renderPages(data.pages || []); })
+      .catch(function () { backendUrl = null; listEl.textContent = ""; statusEl.textContent = OFFLINE; });
+  }
+
+  document.getElementById("add-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var form = e.target;
+    var payload = {
+      title: form.title.value, author: form.author.value, body: form.body.value
+    };
+    statusEl.textContent = "Sending...";
+    getBackend()
+      .then(function (b) {
+        return fetch(b + "/pages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      })
+      .then(function (r) {
+        return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+      })
+      .then(function (res) {
+        if (res.ok) {
+          form.reset();
+          statusEl.textContent = "Thanks! Your page was sent to the team for approval.";
+        } else {
+          statusEl.textContent = res.data.error || "Something went wrong.";
+        }
+      })
+      .catch(function () { backendUrl = null; statusEl.textContent = OFFLINE; });
+  });
+
   window.addEventListener("hashchange", show);
   show();
 </script>
