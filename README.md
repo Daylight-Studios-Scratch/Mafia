@@ -1,11 +1,7 @@
-# Mafia
-The Official GitHub For Mafia On Scratch By Daylight Studios. Here You'll Find Information For Help Related To Remixing, Wiki Browsing Or Cloud Servers.
+Welcome To Mafia! A Social Deduction Game Created By Daylight Studios (2026).
 
-## This Isn't Linked!
-This Isn't Linked To The Actual Scratch Project. It's Only For Information And Page Purposes.
+There Are 3 Factions: Mafia, Civilians And Neutrals.
 
-## Do Not Copy Our Project!
-Please Do Not Directly Copy/Steal Our Project. We Worked Hard On It, And Stealing Projects Is Not Cool At All.
+Your Goal Is To Use Your Role To Help Your Team Uncover The Mafia, Or Strike Down The Civilians.
 
-## You'll Need To Host A Server!
-In Order For Mafia To Actually Work In Your Remix, You'll Need To Host A Server. First, Download ScratchAttach (https://pypi.org/project/scratchattach/) And Login, Then Download Our Python Templete And Run It!
+You Can Find Almost All The Information Inside The Project!
