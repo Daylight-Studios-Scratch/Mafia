@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mafia Wiki</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AD%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="Favicon.ico">
 <meta name="description" content="The Mafia wiki: roles, factions and how to play Mafia, an online social deduction game on Scratch.">
 <style>
   :root { --rain:#2b3239; --deep:#1a1f24; --bar:#6f6f6f; --paper:#fff; --soft:#c9d0d6;
@@ -60,6 +60,16 @@
   .card .head small { font-size:1rem; font-weight:400; }
   .card .body { padding:.7rem 1rem; background:rgba(0,0,0,.3); font-size:1rem; }
   mark { background:#ffd84d; color:#222; border-radius:3px; padding:0 .15rem; }
+  [hidden] { display:none !important; }
+  .tabs button { padding:.2rem .8rem; border:3px solid var(--soft); border-radius:6px; background:transparent; color:var(--paper); font:700 1rem var(--serif); cursor:pointer; }
+  .tabs button[aria-current="page"] { background:rgba(255,255,255,.14); border-color:var(--paper); }
+  .toolbar { display:flex; flex-wrap:wrap; gap:.4rem; margin:0 0 .6rem; }
+  .toolbar button { font:700 1rem var(--serif); color:#fff; background:rgba(255,255,255,.1); border:2px solid var(--soft); border-radius:6px; padding:.2rem .7rem; cursor:pointer; }
+  .toolbar button:hover { border-color:var(--paper); background:rgba(255,255,255,.2); }
+  .visual { min-height:14rem; padding:1rem; margin-bottom:1rem; border:3px solid var(--paper); border-radius:8px; background:rgba(0,0,0,.35); }
+  .visual:focus { outline:3px solid #ffd84d; outline-offset:2px; }
+  .visual a { color:#9fd0ff; text-decoration:underline; }
+  .protected { padding:.5rem .8rem; margin-bottom:.6rem; border:2px dashed var(--soft); border-radius:6px; color:var(--soft); font-size:1rem; }
   footer { margin-top:3rem; color:var(--soft); font-size:1rem; clear:both; }
   @media (max-width:760px) { .shell { flex-direction:column; gap:1rem; padding:1rem; } nav { position:static; flex:none; } nav a { display:inline-block; } .infobox { float:none; width:100%; margin:0 0 1rem; } }
 </style>
@@ -96,13 +106,15 @@ function norm(t) { t = t.replace(/_/g," ").replace(/\s+/g," ").trim(); return t.
 function slug(t) { return encodeURIComponent(norm(t).replace(/ /g,"_")).replace(/%3A/gi,":").replace(/%2F/gi,"/").replace(/%28/g,"(").replace(/%29/g,")"); }
 function pageExists(key) { return !!pages[key] || /^(Special|Category):/.test(key); }
 
-function inline(s) {
+function inline(s, ed) {
   s = esc(s);
   s = s.replace(/\[\[([^\[\]|]+?)(?:\|([^\[\]]+?))?\]\]/g, function (m, t, label) {
     t = unesc(t); var key = norm(t);
+    if (ed) return '<a data-wl="' + esc(t) + '">' + (label || esc(t)) + "</a>";
     return '<a href="#' + slug(key) + '"' + (pageExists(key) ? "" : ' class="missing"') + ">" + (label || esc(t)) + "</a>";
   });
   s = s.replace(/\[(https?:\/\/[^\s\]]+)(?:\s+([^\]]+))?\]/g, function (m, u, label) {
+    if (ed) return '<a data-ext="' + u + '">' + (label || u) + "</a>";
     return '<a href="' + u + '" target="_blank" rel="noopener nofollow ugc">' + (label || u) + "</a>";
   });
   s = s.replace(/'''(.+?)'''/g, "<b>$1</b>").replace(/''(.+?)''/g, "<i>$1</i>");
@@ -130,13 +142,18 @@ function infobox(body) {
   return '<aside class="infobox" style="--c:' + color + '"><div class="ib-title">' + esc(title) + "</div><dl>" + rows.join("") + "</dl></aside>";
 }
 
-function render(text) {
-  var boxes = [], out = [], para = [], stack = [];
+function render(text, ed) {
+  // ed = true gives HTML for the visual editor: links are marked with data
+  // attributes and infoboxes are returned as raw WikiText in `boxes`.
+  var boxes = [], rawBoxes = [], out = [], para = [], stack = [];
   var cats = extractCats(text);
   text = text.replace(/\[\[\s*Category:[^\]]*\]\]/gi, "");
-  text = text.replace(/\{\{\s*Infobox[^\n|}]*([\s\S]*?)\}\}/gi, function (m, body) { boxes.push(infobox(body)); return "\n"; });
-
-  function flushPara() { if (para.length) { out.push("<p>" + inline(para.join(" ")) + "</p>"); para = []; } }
+  text = text.replace(/\{\{\s*Infobox[^\n|}]*([\s\S]*?)\}\}/gi, function (m, body) {
+    if (ed) rawBoxes.push(m.trim()); else boxes.push(infobox(body));
+    return "\n";
+  });
+  function I(x) { return inline(x, ed); }
+  function flushPara() { if (para.length) { out.push("<p>" + I(para.join(" ")) + "</p>"); para = []; } }
   function closeLists() { while (stack.length) out.push("</li></" + stack.pop() + ">"); }
 
   text.split("\n").forEach(function (line) {
@@ -146,17 +163,108 @@ function render(text) {
       var depth = m[1].length, tag = m[1].charAt(depth - 1) === "#" ? "ol" : "ul";
       if (depth > stack.length) { while (stack.length < depth) { stack.push(tag); out.push("<" + tag + "><li>"); } }
       else { while (stack.length > depth) out.push("</li></" + stack.pop() + ">"); out.push("</li><li>"); }
-      out.push(inline(m[2]));
+      out.push(I(m[2]));
       return;
     }
     closeLists();
-    if ((m = /^(={2,4})\s*(.+?)\s*\1\s*$/.exec(line))) { flushPara(); var n = m[1].length; out.push("<h" + n + ">" + inline(m[2]) + "</h" + n + ">"); }
+    if ((m = /^(={2,4})\s*(.+?)\s*\1\s*$/.exec(line))) { flushPara(); var n = m[1].length; out.push("<h" + n + ">" + I(m[2]) + "</h" + n + ">"); }
     else if (/^----+\s*$/.test(line)) { flushPara(); out.push("<hr>"); }
     else if (!line.trim()) flushPara();
     else para.push(line.trim());
   });
   flushPara(); closeLists();
-  return { html: boxes.join("") + out.join("\n"), cats: cats };
+  return { html: boxes.join("") + out.join("\n"), cats: cats, boxes: rawBoxes };
+}
+
+/* ------------------------------------------------------- visual <-> source */
+function decodeEntities(t) { return t.replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&amp;/g, "&"); }
+function attr(node, name) { var m = new RegExp("\\s" + name + '="([^"]*)"').exec(" " + node.attrs); return m ? decodeEntities(m[1]) : null; }
+function squash(t) { return t.replace(/\s+/g, " ").trim(); }
+
+// Turns the visual editor's HTML back into WikiText.
+function htmlToWiki(html) {
+  var root = { tag: "root", attrs: "", kids: [] }, stack = [root], m;
+  var re = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)((?:[^>"']|"[^"]*"|'[^']*')*)>|([^<]+)/g;
+  var VOID = { br: 1, hr: 1, img: 1, input: 1 };
+  while ((m = re.exec(html))) {
+    if (m[4] !== undefined) { stack[stack.length - 1].kids.push({ text: decodeEntities(m[4]) }); continue; }
+    var tag = m[2].toLowerCase();
+    if (m[1]) { for (var i = stack.length - 1; i > 0; i--) if (stack[i].tag === tag) { stack.length = i; break; } }
+    else {
+      var node = { tag: tag, attrs: m[3], kids: [] };
+      stack[stack.length - 1].kids.push(node);
+      if (!VOID[tag] && !/\/\s*$/.test(m[3])) stack.push(node);
+    }
+  }
+  var BLOCK = /^(p|div|h[1-6]|ul|ol|li|hr|blockquote|pre|table)$/;
+  var B3 = "'''", B2 = "''";
+  function isBlock(k) { return !!k.tag && BLOCK.test(k.tag); }
+  function hasBlock(n) { return n.kids.some(isBlock); }
+  function wrap(inner, mark) {
+    var core = inner.trim();
+    if (!core) return inner;
+    return /^\s*/.exec(inner)[0] + mark + core + mark + /\s*$/.exec(inner)[0];
+  }
+  function link(t, inner) { var label = squash(inner); return (!label || label === t) ? "[[" + t + "]]" : "[[" + t + "|" + label + "]]"; }
+  function inl(node) {
+    return node.kids.map(function (k) {
+      if (k.text !== undefined) return k.text;
+      var inner = inl(k);
+      if (k.tag === "b" || k.tag === "strong") return wrap(inner, B3);
+      if (k.tag === "i" || k.tag === "em") return wrap(inner, B2);
+      if (k.tag === "br") return " ";
+      if (k.tag === "a") {
+        var wl = attr(k, "data-wl"), ex = attr(k, "data-ext"), href = attr(k, "href");
+        if (wl !== null) return link(wl, inner);
+        if (ex !== null) { var l1 = squash(inner); return "[" + ex + (l1 && l1 !== ex ? " " + l1 : "") + "]"; }
+        if (href && /^#./.test(href)) {
+          var t; try { t = decodeURIComponent(href.slice(1)).replace(/_/g, " "); } catch (e) { t = href.slice(1); }
+          return link(t, inner);
+        }
+        if (href && /^https?:\/\//i.test(href)) { var l2 = squash(inner); return "[" + href + (l2 && l2 !== href ? " " + l2 : "") + "]"; }
+      }
+      return inner;   // spans, fonts, underline and so on: keep the text, drop the styling
+    }).join("");
+  }
+  function list(n, prefix, lines) {
+    n.kids.forEach(function (li) {
+      if (li.tag !== "li") return;
+      var marker = prefix + (n.tag === "ol" ? "#" : "*");
+      lines.push(marker + " " + squash(inl({ kids: li.kids.filter(function (k) { return k.tag !== "ul" && k.tag !== "ol"; }) })));
+      li.kids.forEach(function (k) { if (k.tag === "ul" || k.tag === "ol") list(k, marker, lines); });
+    });
+  }
+  var out = [];
+  function blocks(nodes) {
+    var buf = [];
+    function flush() { if (buf.length) { var t = squash(inl({ kids: buf })); if (t) out.push(t); buf = []; } }
+    nodes.forEach(function (n) {
+      if (!isBlock(n)) { if (n.tag === "br") flush(); else buf.push(n); return; }
+      flush();
+      if (/^h[1-6]$/.test(n.tag)) {
+        var lv = Math.min(4, Math.max(2, +n.tag.charAt(1))), eq = new Array(lv + 1).join("="), t = squash(inl(n));
+        if (t) out.push(eq + " " + t + " " + eq);
+      } else if (n.tag === "ul" || n.tag === "ol") { var lines = []; list(n, "", lines); if (lines.length) out.push(lines.join("\n")); }
+      else if (n.tag === "hr") out.push("----");
+      else if (hasBlock(n)) blocks(n.kids);
+      else { var t2 = squash(inl(n)); if (t2) out.push(t2); }
+    });
+    flush();
+  }
+  blocks(root.kids);
+  return out.join("\n\n");
+}
+
+function wikiToVisual(text) {
+  var r = render(text, true);
+  return { html: r.html || "<p><br></p>", boxes: r.boxes, cats: r.cats };
+}
+function visualToWiki(v) {
+  var body = htmlToWiki(v.html), parts = [];
+  if (v.boxes.length) parts.push(v.boxes.join("\n"));
+  if (body) parts.push(body);
+  if (v.cats.length) parts.push(v.cats.map(function (c) { return "[[Category:" + c + "]]"; }).join("\n"));
+  return parts.join("\n\n") + "\n";
 }
 
 /* ------------------------------------------------------------------ search */
@@ -205,33 +313,45 @@ function getBackend() {
 }
 function withTimeout(ms) { var c = new AbortController(); setTimeout(function () { c.abort(); }, ms); return c.signal; }
 
+var basePages = {}, lastRemote = "";
+var OFFLINE_NOTE = "Community edits are offline right now. You're seeing the saved version of the wiki.";
+
+function rebuildPages(remote) {
+  pages = {};
+  Object.keys(basePages).forEach(function (t) { pages[norm(t)] = { title: norm(t), text: basePages[t] }; });
+  if (remote) {
+    (remote.pages || []).forEach(function (p) { pages[norm(p.title)] = { title: norm(p.title), text: p.body, author: p.author }; });
+    (remote.deleted || []).forEach(function (t) { delete pages[norm(t)]; });
+  }
+}
+function editing() { var h = ""; try { h = decodeURIComponent(location.hash); } catch (e) {} return /^#\/?Special:(Edit|NewPage)/i.test(h); }
+
+// Edits go live straight away, so the saved pages are re-checked every minute.
+function refreshRemote() {
+  return getBackend()
+    .then(function (b) { return fetch(b + "/pages", { signal: withTimeout(8000), cache: "no-store" }); })
+    .then(function (r) { if (!r.ok) throw new Error("http"); return r.json(); })
+    .then(function (d) {
+      statusEl.textContent = "";
+      var key = JSON.stringify(d);
+      if (key === lastRemote) return;
+      lastRemote = key; rebuildPages(d);
+      if (!editing()) route();
+    })
+    .catch(function () { backendUrl = null; statusEl.textContent = OFFLINE_NOTE; });
+}
+
 function loadPages() {
   fetch("pages.json", { cache: "no-cache" })
     .then(function (r) { if (!r.ok) throw new Error("pages.json: HTTP " + r.status); return r.json(); })
-    .then(function (o) {
-      Object.keys(o).forEach(function (t) { pages[norm(t)] = { title: norm(t), text: o[t] }; });
-      route();
-      return true;
-    })
+    .then(function (o) { basePages = o; rebuildPages(null); route(); return true; })
     .catch(function (e) {
       view.innerHTML = "<h1>Wiki unavailable</h1><p>The page data (<code>pages.json</code>) couldn't be loaded. " +
         "If you run this wiki, check that <code>pages.json</code> is uploaded next to <code>index.html</code> and is valid JSON.</p>" +
         '<p class="help">Details: ' + esc(String(e && e.message || e)) + "</p>";
       return false;
     })
-    .then(function (ok) {
-      if (!ok) return;
-      // Edits and new pages from the server override the built-in ones.
-      return getBackend()
-        .then(function (b) { return fetch(b + "/pages", { signal: withTimeout(8000) }); })
-        .then(function (r) { if (!r.ok) throw new Error("http"); return r.json(); })
-        .then(function (d) {
-          (d.pages || []).forEach(function (p) { pages[norm(p.title)] = { title: norm(p.title), text: p.body, author: p.author }; });
-          (d.deleted || []).forEach(function (t) { delete pages[norm(t)]; });
-          route();
-        })
-        .catch(function () { backendUrl = null; statusEl.textContent = "Community edits are offline right now. You're seeing the saved version of the wiki."; });
-    });
+    .then(function (ok) { if (ok) { refreshRemote(); setInterval(refreshRemote, 60000); } });
 }
 
 function tabs(title, active) {
@@ -278,28 +398,99 @@ function viewNewPage() {
   document.getElementById("np-title").onkeydown = function (e) { if (e.key === "Enter") go(); };
 }
 
+var TOOLS = [["bold", "B", "Bold"], ["italic", "I", "Italic"], ["h2", "H2", "Heading"], ["h3", "H3", "Subheading"],
+  ["p", "\u00b6", "Normal text"], ["ul", "\u2022 List", "Bulleted list"], ["ol", "1. List", "Numbered list"],
+  ["link", "Link", "Add a link"], ["unlink", "Unlink", "Remove a link"], ["hr", "\u2014", "Divider line"]];
+
 function viewEditor(title) {
-  var p = pages[title];
+  var p = pages[title], mode = "visual", boxesRaw = [];
   view.innerHTML = tabs(title, "edit") + "<h1>Editing " + esc(title) + "</h1>" +
-    '<label>Page text<textarea id="ed-text" rows="18" maxlength="20000"></textarea></label>' +
+    '<div class="tabs" role="group" aria-label="Editing mode"><button type="button" id="m-visual" aria-current="page">Visual</button>' +
+    '<button type="button" id="m-source">Source</button></div>' +
+    '<div class="toolbar" id="ed-toolbar">' + TOOLS.map(function (t) {
+      return '<button type="button" data-cmd="' + t[0] + '" title="' + t[2] + '" aria-label="' + t[2] + '">' + t[1] + "</button>"; }).join("") + "</div>" +
+    '<div id="ed-protected"></div>' +
+    '<div class="visual" id="ed-visual" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Page content"></div>' +
+    '<label id="ed-cats-wrap">Categories (separate with commas)<input id="ed-cats" maxlength="200"></label>' +
+    '<textarea id="ed-text" rows="18" maxlength="20000" aria-label="Page source (WikiText)" hidden></textarea>' +
     '<label>Your name (optional)<input id="ed-author" maxlength="30"></label>' +
-    '<button class="btn" id="ed-preview" type="button">Preview</button><button class="btn" id="ed-save" type="button">Submit for review</button>' +
+    '<button class="btn" id="ed-preview" type="button">Preview</button><button class="btn" id="ed-save" type="button">Save edit</button>' +
     '<p id="ed-status" class="help" role="status"></p><div class="preview" id="ed-box"></div>' +
-    '<p class="help">Formatting: <code>== Heading ==</code> <code>\'\'\'bold\'\'\'</code> <code>\'\'italic\'\'</code> <code>[[Page]]</code> <code>[[Page|label]]</code> ' +
-    '<code>* list</code> <code># numbered</code> <code>[[Category:Roles]]</code> <code>{{Infobox role|name=...|faction=...|color=#e60000}}</code>. Edits are checked by the team before they appear. To stop abuse, a scrambled version of your IP address is saved with your edit; the real address is never stored.</p>';
-  var ta = document.getElementById("ed-text"), st = document.getElementById("ed-status");
+    '<p class="help">Edits go live straight away, and moderators can undo them. To stop abuse, a scrambled version of your IP address is saved with each edit; the real address is never stored. ' +
+    "Source mode uses WikiText: <code>== Heading ==</code> <code>'''bold'''</code> <code>''italic''</code> <code>[[Page]]</code> <code>[[Page|label]]</code> <code>* list</code> <code>[[Category:Roles]]</code> <code>{{Infobox role|name=...|faction=...|color=#e60000}}</code>.</p>";
+
+  var vis = document.getElementById("ed-visual"), ta = document.getElementById("ed-text"), prot = document.getElementById("ed-protected"),
+      catsEl = document.getElementById("ed-cats"), catsWrap = document.getElementById("ed-cats-wrap"), tool = document.getElementById("ed-toolbar"),
+      st = document.getElementById("ed-status"), mV = document.getElementById("m-visual"), mS = document.getElementById("m-source");
+
+  function loadVisual(text) {
+    var v = wikiToVisual(text);
+    vis.innerHTML = v.html; boxesRaw = v.boxes; catsEl.value = v.cats.join(", ");
+    prot.innerHTML = v.boxes.map(function () { return '<div class="protected">An infobox is kept as it is. Edit it in Source mode.</div>'; }).join("");
+  }
+  function readVisual() {
+    return visualToWiki({ html: vis.innerHTML, boxes: boxesRaw,
+      cats: catsEl.value.split(",").map(function (c) { return norm(c); }).filter(function (c) { return c; }) });
+  }
+  function getText() { return mode === "visual" ? readVisual() : ta.value; }
+  function setMode(m) {
+    if (m === mode) return;
+    if (m === "source") ta.value = readVisual(); else loadVisual(ta.value);
+    mode = m;
+    var v = m === "visual";
+    vis.hidden = prot.hidden = tool.hidden = catsWrap.hidden = !v; ta.hidden = v;
+    if (v) { mV.setAttribute("aria-current", "page"); mS.removeAttribute("aria-current"); }
+    else { mS.setAttribute("aria-current", "page"); mV.removeAttribute("aria-current"); }
+  }
+  mV.onclick = function () { setMode("visual"); };
+  mS.onclick = function () { setMode("source"); };
+
   ta.value = p ? p.text : "";
+  loadVisual(ta.value);
+
+  function command(c) {
+    if (c === "bold" || c === "italic") document.execCommand(c);
+    else if (c === "h2" || c === "h3" || c === "p") document.execCommand("formatBlock", false, c);
+    else if (c === "ul") document.execCommand("insertUnorderedList");
+    else if (c === "ol") document.execCommand("insertOrderedList");
+    else if (c === "hr") document.execCommand("insertHorizontalRule");
+    else if (c === "unlink") document.execCommand("unlink");
+    else if (c === "link") {
+      var target = (window.prompt("Page title, or a web address starting with https://", "") || "").trim();
+      if (!target) return;
+      var href = /^https?:\/\//i.test(target) ? target : "#" + slug(target);
+      if (String(window.getSelection())) document.execCommand("createLink", false, href);
+      else document.execCommand("insertHTML", false, '<a href="' + esc(href) + '">' + esc(target) + "</a>");
+    }
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("#ed-toolbar button"), function (b) {
+    b.onmousedown = function (e) { e.preventDefault(); };   // keep the text selected
+    b.onclick = function () { vis.focus(); command(b.getAttribute("data-cmd")); };
+  });
+  // Paste as plain text so no foreign formatting sneaks in.
+  vis.addEventListener("paste", function (e) {
+    e.preventDefault();
+    document.execCommand("insertText", false, (e.clipboardData || window.clipboardData).getData("text/plain"));
+  });
+
   document.getElementById("ed-preview").onclick = function () {
-    document.getElementById("ed-box").innerHTML = "<h1>" + esc(title) + "</h1>" + render(ta.value).html;
+    document.getElementById("ed-box").innerHTML = "<h1>" + esc(title) + "</h1>" + render(getText()).html;
   };
   document.getElementById("ed-save").onclick = function () {
-    if (!ta.value.trim()) { st.textContent = "Write something first."; return; }
-    st.textContent = "Sending...";
+    var text = getText(), author = document.getElementById("ed-author").value;
+    if (!text.replace(/\[\[Category:[^\]]*\]\]/g, "").trim()) { st.textContent = "Write something first."; return; }
+    st.textContent = "Saving...";
     getBackend().then(function (b) {
       return fetch(b + "/pages", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: title, body: ta.value, author: document.getElementById("ed-author").value }) });
+        body: JSON.stringify({ title: title, body: text, author: author }) });
     }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-      .then(function (x) { st.textContent = x.ok ? "Thanks! Your edit was sent to the team for approval." : (x.d.error || "Something went wrong."); })
+      .then(function (x) {
+        if (!x.ok) { st.textContent = x.d.error || "Something went wrong."; return; }
+        pages[norm(title)] = { title: norm(title), text: text, author: author };
+        lastRemote = "";   // re-sync with the server on the next check
+        statusEl.textContent = "Saved. Your edit is live.";
+        if (location.hash === "#" + slug(title)) route(); else location.hash = "#" + slug(title);
+      })
       .catch(function () { backendUrl = null; st.textContent = "The community server is offline right now. Try again later."; });
   };
 }
