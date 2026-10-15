@@ -205,20 +205,31 @@ function getBackend() {
 function withTimeout(ms) { var c = new AbortController(); setTimeout(function () { c.abort(); }, ms); return c.signal; }
 
 function loadPages() {
-  var base = fetch("pages.json").then(function (r) { return r.json(); }).then(function (o) {
-    Object.keys(o).forEach(function (t) { pages[norm(t)] = { title: norm(t), text: o[t] }; });
-  });
-  base.then(route);
-  // Edits and new pages from the server override the built-in ones.
-  base.then(function () { return getBackend(); })
-    .then(function (b) { return fetch(b + "/pages", { signal: withTimeout(8000) }); })
-    .then(function (r) { if (!r.ok) throw new Error("http"); return r.json(); })
-    .then(function (d) {
-      (d.pages || []).forEach(function (p) { pages[norm(p.title)] = { title: norm(p.title), text: p.body, author: p.author }; });
-      (d.deleted || []).forEach(function (t) { delete pages[norm(t)]; });
+  fetch("pages.json")
+    .then(function (r) { if (!r.ok) throw new Error("pages.json: HTTP " + r.status); return r.json(); })
+    .then(function (o) {
+      Object.keys(o).forEach(function (t) { pages[norm(t)] = { title: norm(t), text: o[t] }; });
       route();
+      return true;
     })
-    .catch(function () { backendUrl = null; statusEl.textContent = "Community edits are offline right now. You're seeing the saved version of the wiki."; });
+    .catch(function () {
+      view.innerHTML = "<h1>Wiki unavailable</h1><p>The page data (<code>pages.json</code>) couldn't be loaded. " +
+        "If you run this wiki, check that <code>pages.json</code> is uploaded next to <code>index.html</code>.</p>";
+      return false;
+    })
+    .then(function (ok) {
+      if (!ok) return;
+      // Edits and new pages from the server override the built-in ones.
+      return getBackend()
+        .then(function (b) { return fetch(b + "/pages", { signal: withTimeout(8000) }); })
+        .then(function (r) { if (!r.ok) throw new Error("http"); return r.json(); })
+        .then(function (d) {
+          (d.pages || []).forEach(function (p) { pages[norm(p.title)] = { title: norm(p.title), text: p.body, author: p.author }; });
+          (d.deleted || []).forEach(function (t) { delete pages[norm(t)]; });
+          route();
+        })
+        .catch(function () { backendUrl = null; statusEl.textContent = "Community edits are offline right now. You're seeing the saved version of the wiki."; });
+    });
 }
 
 function tabs(title, active) {
