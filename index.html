@@ -92,7 +92,7 @@
   <main>
     <p id="status" role="status"></p>
     <div id="view"></div>
-    <footer>Mafia is made by Daylight Studios. Currently in beta. Advertising is not allowed.</footer>
+    <footer>Mafia is made by Daylight Studios. Currently in beta.</footer>
   </main>
 </div>
 
@@ -338,7 +338,14 @@ function refreshRemote() {
       lastRemote = key; rebuildPages(d);
       if (!editing()) route();
     })
-    .catch(function () { backendUrl = null; statusEl.textContent = OFFLINE_NOTE; });
+    .catch(function (e) {
+      var host = backendUrl ? backendUrl.replace(/^https:\/\//, "") : "";
+      var why = e && e.message === "pointer" ? "Couldn't read Backend HTTP.txt from GitHub."
+        : e && e.message === "bad address" ? "Backend HTTP.txt doesn't contain a single https:// address."
+        : "The server at " + (host || "the saved address") + " didn't answer.";
+      backendUrl = null;
+      statusEl.textContent = OFFLINE_NOTE + " (" + why + ")";
+    });
 }
 
 function loadPages() {
